@@ -1,0 +1,11 @@
+- name: Edit security group rules for Bastion
+  ec2_group:
+    name: bastion.{{ cluster_name }}
+    description: "Security group for Bastion"
+    region: "{{ region }}"
+    rules:
+      - proto: tcp
+        ports:
+        - 22
+        cidr_ip: 0.0.0.0/0
+        rule_desc: allow all on port 80

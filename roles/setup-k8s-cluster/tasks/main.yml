@@ -1,0 +1,11 @@
+- name: AWS Facts
+  import_tasks: set-aws-info.yml
+
+- name: Create Cluster Tasks
+  import_tasks: create-cluster.yml
+
+- name: Security Group tasks
+  import_tasks: edit-security-group-rules.yml
+
+- name: Validate Cluster
+  import_tasks: validate-cluster.yml
