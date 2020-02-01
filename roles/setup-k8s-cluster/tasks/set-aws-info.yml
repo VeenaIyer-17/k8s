@@ -1,0 +1,26 @@
+- name: aws availability zones
+  aws_az_info:
+    profile: kops
+    region: "{{ region }}"
+  register: az_regions
+
+- name: set master count values
+  set_fact:
+    master_count: 3
+  when: "{{  az_regions.availability_zones|length>=3 }}"
+
+- name: set node count values
+  set_fact:
+    node_counts: 3
+  when: "{{  az_regions.availability_zones|length>=3 and node_count|int<=3 }}"
+
+- name: print master count
+  debug: var="{{ master_count }}"
+
+- name: print node count
+  debug: var="{{ node_counts }}"  
+
+- name: Set Fact
+  set_fact:
+    nodes_availability_zones: "{{ az_regions.availability_zones[0:node_counts|int] | map(attribute='zone_name') | list | join(',') }}"
+    masters_availability_zones: "{{ az_regions.availability_zones[0:master_count|int] | map(attribute='zone_name') | list | join(',') }}"
