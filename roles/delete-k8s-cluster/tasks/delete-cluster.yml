@@ -1,5 +1,12 @@
 - name: Initiate Delete Kubernetes Cluster
   shell: echo "Deleting Cluster {{ cluster_name }} "
+- name: set kops state store
+  set_fact:
+    kops_state_store: s3://{{cluster_name}}
+
+- name: debug kops state
+  debug:
+    msg: "{{kops_state_store}}"
 
 - name: Deleting Kubernetes Cluster
   shell: |
