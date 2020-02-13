@@ -1,0 +1,7 @@
+- name: Get default VPC
+  ec2_vpc_net_info:
+    profile: "{{profile}}"
+    region: "{{region}}"
+    filters:
+      "isDefault" : True 
+  register: defaultVPC

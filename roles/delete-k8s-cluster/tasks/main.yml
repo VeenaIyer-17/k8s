@@ -1,2 +1,8 @@
+- name: Delete VPC peering
+  import_tasks: delete-vpc-peering.yml
+
 - name: Delete Cluster
   import_tasks: delete-cluster.yml
+
+- name: Delete RDS
+  import_tasks: delete-rds.yml

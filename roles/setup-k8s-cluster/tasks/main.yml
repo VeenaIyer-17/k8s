@@ -4,5 +4,10 @@
 - name: Security Group tasks
   import_tasks: edit-security-group-rules.yml
 
+- name: Setup RDS
+  import_tasks: create-rds.yml
+
 - name: Validate Cluster
   import_tasks: validate-cluster.yml
+# - name: Test
+#   import_tasks: test.yml
