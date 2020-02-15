@@ -18,9 +18,6 @@
         kops_state_store: s3://{{cluster_name}}
 
   roles:
-    - role: setup-rds
-      when: command == "start"
-
     - role: setup-k8s-cluster
       when: command == "start"
 

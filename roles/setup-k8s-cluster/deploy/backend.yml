@@ -1,126 +1,125 @@
-- name: Run on Local
-  hosts: localhost
-  connection: local
-  become: false
-  gather_facts: False
+- name: get rds endpoint
+  rds_instance_info:
+    profile: "{{profile}}"
+    region: "{{region}}"
+    db_instance_identifier: csye7374
+  register: new_database_info
 
-  tasks:
-    - name: get rds endpoint
-      - rds_instance_info:
-          db_instance_identifier: csye7374
-        register: new_database_info
+- name: Create a api namespace
+  k8s:
+    name: api
+    api_version: v1
+    kind: Namespace
+    state: present
+  register: api_namespace
 
-    - name: Create a api namespace
-      k8s:
-        name: api
-        api_version: v1
-        kind: Namespace
-        state: present
-      register: api_namespace
+- name: Create Secret key backend
+  shell: "kubectl create secret generic myregistrykey --from-file=.dockerconfigjson=/home/atom/.docker/config.json --type=kubernetes.io/dockerconfigjson -n {{api_namespace.result.metadata.name}}"
+  ignore_errors: true
+  
+- name: create database config
+  k8s:
+    state: present
+    definition:
+      kind: ConfigMap
+      apiVersion: v1
+      metadata:
+        name: database-config
+        namespace: "{{api_namespace.result.metadata.name}}"
+      data:
+        # Configuration values can be set as key-value properties
+        MYSQL_HOST: "jdbc:mariadb://{{new_database_info.instances[0].endpoint.address}}:3306/csye7374"
 
-    - name: create database config
-      k8s:
-        state: present
-        definition:
-          kind: ConfigMap
-          apiVersion: v1
+- name: create database secret
+  k8s:
+    state: present
+    definition:
+      kind: Secret
+      apiVersion: v1
+      metadata:
+        name: database-secret
+        namespace: "{{api_namespace.result.metadata.name}}"
+      data:
+        # Configuration values can be set as key-value properties
+        MYSQL_USER: cm9vdAo=
+        MYSQL_PASSWORD: MjgwNDE5OTIK
+
+- name: create replicaset
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ReplicaSet
+      metadata:
+        name: backend-replica
+        namespace: "{{api_namespace.result.metadata.name}}"
+        labels:
+          app: recipe
+          tier: frontend
+      spec:
+        # modify replicas according to your case
+        replicas: 2
+        selector:
+          matchLabels:
+            tier: backend
+        template:
           metadata:
-            name: database-config
-            namespace: "{{api_namespace.result.metadata.name}}"
-          data:
-            # Configuration values can be set as key-value properties
-            MYSQL_HOST: "{{new_database_info.instances.endpoint.address}}"
-
-    - name: create database secret
-      k8s:
-        state: present
-        definition:
-          kind: Secret
-          apiVersion: v1
-          metadata:
-            name: database-secret
-            namespace: "{{api_namespace.result.metadata.name}}"
-          data:
-            # Configuration values can be set as key-value properties
-            MYSQL_USER: cm9vdAo=
-            MYSQL_PASSWORD: MjgwNDE5OTIK
-
-    - name: create replicaset
-      k8s:
-        state: present
-        definition:
-          apiVersion: v1
-          kind: ReplicaSet
-          metadata:
-            name: backend-replica
-            namespace: "{{api_namespace.result.metadata.name}}"
             labels:
-              app: recipe
-              tier: frontend
-          spec:
-            # modify replicas according to your case
-            replicas: 2
-            selector:
-              matchLabels:
-                tier: backend
-            template:
-              metadata:
-                labels:
-                  tier: backend
-              spec:
-                containers:
-                  - name: backend
-                    image: kiranhun/backend:12e2397a05416fab2c710bbe23921183c540b0a5
-                    imagePullPolicy: IfNotPresent
-                    ports:
-                      - containerPort: 8080
-                        hostPort: 8080
-                    readinessProbe:
-                      httpGet:
-                        path: /v1/allrecipes
-                        port: 8080
-                      initialDelaySeconds: 15
-                      periodSeconds: 10
-                    livenessProbe:
-                      httpGet:
-                        path: /v1/allrecipes
-                        port: 8080
-                      initialDelaySeconds: 15
-                      periodSeconds: 10
-                    env:
-                    - name: MYSQL_HOST
-                      valueFrom:
-                          configMapKeyRef:
-                            name: database-config
-                            key: MYSQL_HOST
-                    - name: MYSQL_USER
-                      valueFrom:
-                          secretKeyRef:
-                            name: database-secret
-                            key: MYSQL_USER
-                    - name: MYSQL_PASSWORD
-                      valueFrom:
-                          secretKeyRef:
-                            name: database-secret
-                            key: MYSQL_PASSWORD
-                imagePullSecrets:
-                  - name: docker_token
-
-    - name: Create a load balancer service
-      k8s:
-        state: present
-        definition:
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: api
-            namespace: "{{api_namespace.result.metadata.name}}"
-          spec:
-            selector:
               tier: backend
-            type: LoadBalancer
-            ports:
-              - protocol: TCP
-                port: 8080
-                targetPort: 8080
-                name: http
+          spec:
+            containers:
+              - name: backend
+                image: "{{backend_image}}"
+                imagePullPolicy: IfNotPresent
+                ports:
+                  - containerPort: 8080
+                    hostPort: 8080
+                readinessProbe:
+                  httpGet:
+                    path: /v1/allrecipes
+                    port: 8080
+                  initialDelaySeconds: 15
+                  periodSeconds: 10
+                livenessProbe:
+                  httpGet:
+                    path: /v1/allrecipes
+                    port: 8080
+                  initialDelaySeconds: 15
+                  periodSeconds: 10
+                env:
+                - name: MYSQL_HOST
+                  valueFrom:
+                      configMapKeyRef:
+                        name: database-config
+                        key: MYSQL_HOST
+                - name: MYSQL_USER
+                  valueFrom:
+                      secretKeyRef:
+                        name: database-secret
+                        key: MYSQL_USER
+                - name: MYSQL_PASSWORD
+                  valueFrom:
+                      secretKeyRef:
+                        name: database-secret
+                        key: MYSQL_PASSWORD
+            imagePullSecrets:
+              - name: myregistrykey
+
+- name: Create a load balancer service
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: api
+        namespace: "{{api_namespace.result.metadata.name}}"
+      spec:
+        selector:
+          tier: backend
+        type: LoadBalancer
+        ports:
+          - protocol: TCP
+            port: 8080
+            targetPort: 8080
+            name: http
