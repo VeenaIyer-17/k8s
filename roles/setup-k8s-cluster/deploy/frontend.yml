@@ -1,11 +1,35 @@
----
-- name: Create a api namespace
+- name: Create a ui namespace
   k8s:
     name: ui
     api_version: v1
     kind: Namespace
     state: present
   register: ui_namespace
+
+- name: Get an existing Service object
+  k8s_info:
+    api_version: v1
+    kind: Service
+    name: api
+    namespace: api
+  register: api_service
+
+- name: Create Secret key frontend
+  shell: "kubectl create secret generic myregistrykey --from-file=.dockerconfigjson=/home/atom/.docker/config.json --type=kubernetes.io/dockerconfigjson -n {{ui_namespace.result.metadata.name}}"
+  ignore_errors: true
+
+- name: Create backend config
+  k8s:
+    state: present
+    definition:
+      kind: ConfigMap 
+      apiVersion: v1
+      metadata:
+        name: ui-config
+        namespace: "{{ui_namespace.result.metadata.name}}"
+      data:
+        # Configuration values can be set as key-value properties
+        backend_url : "http://{{api_service.resources[0].status.loadBalancer.ingress[0].hostname}}:8080"
 
 - name: Create a replica set
   k8s:
@@ -21,7 +45,7 @@
           tier: frontend
       spec:
         # modify replicas according to your case
-        replicas: 1
+        replicas: 2
         selector:
           matchLabels:
             tier: frontend
@@ -30,18 +54,18 @@
             labels:
               tier: frontend
           spec:
-            initContainers:
-              - name: init-myservice
-                image: busybox:1.28
-                command:
-                  [
-                    "sh",
-                    "-c",
-                    "until nslookup api.api.svc.cluster.local; do echo waiting for myservice; sleep 2; done;",
-                  ]
-            containers:
+              initContainers:
+                - name: init-myservice
+                  image: busybox:1.28
+                  command:
+                    [
+                      "sh",
+                      "-c",
+                      "until nslookup api.api.svc.cluster.local; do echo waiting for myservice; sleep 2; done;",
+                    ]
+              containers:
               - name: frontend
-                image: akashkatakam/webapp-frontend:v1
+                image: "{{frontend_image}}"
                 imagePullPolicy: Always
                 ports:
                   - containerPort: 3000
@@ -60,11 +84,14 @@
                   periodSeconds: 10
                 env:
                   - name: REACT_APP_BACKEND_URL
-                    value: http://localhost:8080
+                    valueFrom:
+                      configMapKeyRef:
+                        name: ui-config
+                        key: backend_url
 
                 command: ["npm", "start"]
-            imagePullSecrets:
-              - name: docker_token
+              imagePullSecrets:
+              - name: myregistrykey
 
 - name: Create a load balancer service
   k8s:

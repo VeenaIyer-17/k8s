@@ -6,6 +6,8 @@
     filters:
       "tag:Name": "{{vpc_name}}"
   register: defaultVPC
+
+- name: set facts
   set_fact:
       default_vpc_id: "{{ defaultVPC.vpcs[0].vpc_id }}"
       default_vpc_cidr_block: "{{ defaultVPC.vpcs[0].cidr_block }}"
@@ -17,6 +19,8 @@
     filters:
       "tag:Name" : "{{cluster_name}}"
   register: k8sVPC
+
+- name: set facts
   set_fact:
       k8s_vpc_cidr_block: "{{ k8sVPC.vpcs[0].cidr_block }}"
       k8s_vpc_id: "{{ k8sVPC.vpcs[0].vpc_id }}"
@@ -38,6 +42,8 @@
         cidr_ip: "{{ default_vpc_cidr_block }}"
         rule_desc: Access to default VPC for 3306
   register: rds_security_group
+
+- name: set fact  
   set_fact:
       rds_security_group_id: "{{rds_security_group.group_id}}"
 

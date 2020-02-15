@@ -15,6 +15,3 @@
 
 - name: Deploy Frontend
   import_tasks: deploy/frontend.yml
-
-# - name: Test
-#   import_tasks: test.yml

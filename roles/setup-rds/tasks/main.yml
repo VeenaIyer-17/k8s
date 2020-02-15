@@ -1,3 +1,0 @@
----
-- name: Creating RDS
-  import_tasks: create-rds.yml
