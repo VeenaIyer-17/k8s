@@ -1,0 +1,119 @@
+- name: Run on Local
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: False
+
+  tasks:
+    - name: Create a api namespace
+      k8s:
+        name: api
+        api_version: v1
+        kind: Namespace
+        state: present
+      register: api_namespace
+
+    - name: create database config
+      k8s:
+        state: present
+        definition:
+          kind: ConfigMap
+          apiVersion: v1
+          metadata:
+            name: database-config
+            namespace: "{{api_namespace.result.metadata.name}}"
+          data:
+            # Configuration values can be set as key-value properties
+            MYSQL_HOST: "{{MYSQL_HOST}}"
+
+    - name: create database secret
+      k8s:
+        state: present
+        definition:
+          kind: Secret
+          apiVersion: v1
+          metadata:
+            name: database-secret
+            namespace: "{{api_namespace.result.metadata.name}}"
+          data:
+            # Configuration values can be set as key-value properties
+            MYSQL_USER: "{{MYSQL_USER}}"
+            MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}" 
+
+    - name: create replicaset
+      k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ReplicaSet
+          metadata:
+            name: backend-replica
+            namespace: "{{api_namespace.result.metadata.name}}"
+            labels:
+              app: recipe
+              tier: frontend
+          spec:
+            # modify replicas according to your case
+            replicas: 2
+            selector:
+              matchLabels:
+                tier: backend
+            template:
+              metadata:
+                labels:
+                  tier: backend
+              spec:
+                containers:
+                - name: backend
+                  image: "{{image_name_backend}}"
+                  imagePullPolicy: IfNotPresent
+                  ports:
+                    - containerPort: 8080
+                      hostPort: 8080
+                  readinessProbe:
+                    httpGet:
+                      path: /v1/allrecipes
+                      port: 8080
+                    initialDelaySeconds: 15
+                    periodSeconds: 10
+                  livenessProbe:
+                    httpGet:
+                      path: /v1/allrecipes
+                      port: 8080
+                    initialDelaySeconds: 15
+                    periodSeconds: 10
+                  env:
+                  - name: MYSQL_HOST
+                    valueFrom:
+                        configMapKeyRef:
+                          name: database-config
+                          key: MYSQL_HOST
+                  - name: MYSQL_USER
+                    valueFrom:
+                        secretKeyRef:
+                          name: database-secret
+                          key: MYSQL_USER
+                  - name: MYSQL_PASSWORD
+                    valueFrom:
+                        secretKeyRef:
+                          name: database-secret
+                          key: MYSQL_PASSWORD
+
+    - name: Create a load balancer service
+      k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: api
+            namespace: "{{api_namespace.result.metadata.name}}"
+          spec:
+            selector:
+              tier: backend
+            type: LoadBalancer
+            ports:
+              - protocol: TCP
+                port: 8080
+                targetPort: 8080
+                name: http
