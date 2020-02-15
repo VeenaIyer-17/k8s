@@ -1,23 +1,73 @@
 - name: Initiate Create Kubernetes Cluster
   shell: echo "Creating Cluster   {{ cluster_name }} "
 
+- name: get clusters
+  command: kops get clusters
+  ignore_errors: yes
+  register: clusters
+
+- name: Get cluster environment
+  set_fact:
+    type: "{{type}}"
+
+- name: Set dev facts
+  set_fact:
+    compute_node_size: "{{ compute_node_size | default('t2.micro') }}"
+    master_node_size: "{{ master_node_size | default('t2.micro')}}"
+    master_node_count: "{{ master_node_count | default(1)}}"
+    node_counts: "{{ node_counts | default(1)}}"
+  when: type == "dev"
+
+- name: Set Prod facts
+  set_fact:
+    compute_node_size: "{{compute_node_size | default('t3.small')}}"
+    master_node_size: "{{master_node_size | default('m4.large')}}"
+    master_node_count: "{{master_node_count | default(3)}}"
+    node_counts: "{{node_counts | default(3)}}"
+  when: type == "prod"
+
+- name: Get AZ
+  include_tasks: set-aws-info.yml
+
+- name: Set AZ
+  set_fact:
+    nodes_availability_zones: "{{nodes_availability_zones}}"
+    masters_availability_zones: "{{masters_availability_zones}}"
+
+- name: Set up kubernetes_version
+  set_fact:
+    kubernetes_version: 1.15.0
+  when: kubernetes_version is not defined
+
+- name: Setup topology
+  set_fact:
+    topology: private
+  when: topology is not defined
+
+- name: Setup networking
+  set_fact:
+    networking: kopeio-vxlan
+  when: networking is not defined
+
 - name: Creating Cluster Configuration
   shell: |
-    kops create cluster \
-    --cloud={{ cloud }} --zones={{ nodes_availability_zones }} \
-    --master-count={{ master_count }} \
+    AWS_PROFILE={{ profile }} kops create cluster \
+    --cloud={{ cloud }} --zones={{ nodes_availability_zones }} \  
+    --master-count={{ master_node_count }} \
     --master-zones={{ masters_availability_zones }} \
     --dns-zone={{ dns_zone_id }} \ 
     --node-count={{ node_counts }} \
-    --master-size={{ master_size }} \
-    --node-size={{ node_size }} \
+    --master-size={{ master_node_size }} \
+    --node-size={{ compute_node_size }} \
     --topology={{ topology }} \
     --name={{ cluster_name }} \
     --networking={{ networking }} \
     --bastion \
     --ssh-public-key={{ ssh_path }} \
     --state={{ kops_state_store }} \
-    --kubernetes-version={{ k8s_version }}
+    --kubernetes-version={{ kubernetes_version }}
+  when: clusters.stdout.find( '{{cluster_name}}' ) == -1
+
 
 - name: Setup Cluster
   shell: AWS_PROFILE={{ profile }} kops update cluster {{ cluster_name }} --state={{ kops_state_store }} --yes

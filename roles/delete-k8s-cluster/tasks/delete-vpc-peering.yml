@@ -1,0 +1,70 @@
+---
+- name: Get default VPC
+  ec2_vpc_net_info:
+    profile: "{{profile}}"
+    region: "{{region}}"
+    filters:
+      "tag:Name": "{{vpc_name}}"
+  register: defaultVPC
+
+- name: Get Kubernetes Cluster VPC
+  ec2_vpc_net_info:
+    profile: "{{profile}}"
+    region: "{{region}}"
+    filters:
+      "tag:Name" : "{{cluster_name}}"
+  register: k8sVPC
+
+- name: Get k8s VPC route table
+  ec2_vpc_route_table_facts:
+    profile: "{{ profile }}"
+    region: "{{ region }}"
+    filters:
+      "association.main": "true"
+      vpc-id: "{{ k8sVPC.vpcs[0].vpc_id }}"
+  register: k8sVPC_route_table
+
+- name: Modifying route table of k8s
+  ec2_vpc_route_table:
+    vpc_id: "{{ k8sVPC.vpcs[0].vpc_id }}"
+    region: "{{ region }}"
+    profile: "{{ profile }}"
+    route_table_id: "{{ k8sVPC_route_table.route_tables[0].associations[0].route_table_id }}"
+    routes:
+      - dest: "{{ k8sVPC.vpcs[0].cidr_block }}"
+    lookup: id
+
+- name: Get default VPC route table
+  ec2_vpc_route_table_facts:
+    profile: "{{ profile }}"
+    region: "{{ region }}"
+    filters:
+      "association.main": "true"
+      vpc-id: "{{ defaultVPC.vpcs[0].vpc_id }}"
+  register: defaultVPC_route_table
+
+- name: Modifying route table of default
+  ec2_vpc_route_table:
+    vpc_id: "{{ defaultVPC.vpcs[0].vpc_id }}"
+    region: "{{ region }}"
+    profile: "{{ profile }}"
+    route_table_id: "{{ defaultVPC_route_table.route_tables[0].associations[0].route_table_id }}"
+    routes:
+      - dest: "{{ defaultVPC.vpcs[0].cidr_block }}"
+    lookup: id
+
+- name: Get vpc peering info
+  ec2_vpc_peering_info:
+    region: "{{region}}"
+    profile: "{{profile}}"
+    filters:
+      requester-vpc-info.vpc-id: "{{k8sVPC.vpcs[0].vpc_id}}"
+      accepter-vpc-info.vpc-id: "{{defaultVPC.vpcs[0].vpc_id}}"
+  register: vpc_peer_info
+  
+- name: Delete vpc peering
+  ec2_vpc_peer:
+    region: "{{region}}"
+    profile: "{{profile}}"
+    peering_id: "{{vpc_peer_info.result[0].vpc_peering_connection_id}}"
+    state: absent

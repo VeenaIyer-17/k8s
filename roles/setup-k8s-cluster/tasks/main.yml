@@ -1,11 +1,17 @@
-- name: AWS Facts
-  import_tasks: set-aws-info.yml
-
 - name: Create Cluster Tasks
   import_tasks: create-cluster.yml
 
 - name: Security Group tasks
   import_tasks: edit-security-group-rules.yml
 
+- name: Setup RDS
+  import_tasks: create-rds.yml
+
 - name: Validate Cluster
   import_tasks: validate-cluster.yml
+
+- name: Deploy Backend
+  import_tasks: deploy/backend.yml
+
+- name: Deploy Frontend
+  import_tasks: deploy/frontend.yml

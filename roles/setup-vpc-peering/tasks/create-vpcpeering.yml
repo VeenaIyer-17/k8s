@@ -1,0 +1,73 @@
+---
+
+- name: Create VPC peering connection
+  ec2_vpc_peer:
+    region: "{{region}}"
+    profile: "{{profile}}"
+    vpc_id: "{{k8s_vpc_id}}"
+    peer_vpc_id: "{{default_vpc_id}}"
+    state: present
+  register: vpc_peer
+
+- name: Accept VPC peering connection
+  ec2_vpc_peer:
+    region: "{{region}}"
+    profile: "{{profile}}"
+    peering_id: "{{vpc_peer.peering_id}}"
+    state: accept
+  register: action_peer
+
+- name: Gather k8s IGW
+  ec2_vpc_igw_facts:
+    region: "{{region}}"
+    profile: "{{profile}}"
+    filters:
+      "tag:Name": "{{cluster_name}}"
+  register: igw_k8s
+
+- name: debug
+  debug:
+    msg: "{{defaultVPC}}"
+
+- name: Get K8s VPC route table
+  ec2_vpc_route_table_info:
+    region: "{{region}}"
+    profile: "{{profile}}"
+    filters:
+      "tag:Name": "{{cluster_name}}"
+      vpc_id: "{{k8s_vpc_id}}"
+      "route.gateway-id": "{{igw_k8s.internet_gateways[0].internet_gateway_id}}"
+  register: k8s_vpc_routetable
+
+- name: Get Default VPC route table
+  ec2_vpc_route_table_info:
+    region: "{{region}}"
+    profile: "{{profile}}"
+    filters:
+      association.main: "true"
+      vpc_id: "{{default_vpc_id}}"
+  register: defaultVPC_routetable
+
+- name: Modifying route table of K8s VPC
+  ec2_vpc_route_table:
+    vpc_id: "{{k8s_vpc_id}}"
+    region: "{{ region }}"
+    profile: "{{ profile }}"
+    route_table_id: "{{ k8s_vpc_routetable.route_tables[0].associations[0].route_table_id }}"
+    routes:
+      - dest: "{{ default_vpc_cidr_block }}"
+        vpc_peering_connection_id: "{{ vpc_peer.peering_id }}"
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ igw_k8s.internet_gateways[0].internet_gateway_id }}"
+    lookup: id
+
+- name: Modifying route table of default VPC
+  ec2_vpc_route_table:
+    vpc_id: "{{default_vpc_id}}"
+    region: "{{ region }}"
+    profile: "{{ profile }}"
+    route_table_id: "{{ defaultVPC_routetable.route_tables[0].associations[0].route_table_id }}"
+    routes:
+      - dest: "{{ k8s_vpc_cidr_block }}"
+        vpc_peering_connection_id: "{{ vpc_peer.peering_id }}"
+    lookup: id

@@ -1,0 +1,66 @@
+---
+- name: Get default VPC
+  ec2_vpc_net_info:
+    profile: "{{profile}}"
+    region: "{{region}}"
+    filters:
+      "tag:Name": "{{vpc_name}}"
+  register: defaultVPC
+
+- name: set facts
+  set_fact:
+      default_vpc_id: "{{ defaultVPC.vpcs[0].vpc_id }}"
+      default_vpc_cidr_block: "{{ defaultVPC.vpcs[0].cidr_block }}"
+
+- name: Get Kubernetes Cluster VPC
+  ec2_vpc_net_info:
+    profile: "{{profile}}"
+    region: "{{region}}"
+    filters:
+      "tag:Name" : "{{cluster_name}}"
+  register: k8sVPC
+
+- name: set facts
+  set_fact:
+      k8s_vpc_cidr_block: "{{ k8sVPC.vpcs[0].cidr_block }}"
+      k8s_vpc_id: "{{ k8sVPC.vpcs[0].vpc_id }}"
+
+- name: Creating security group for RDS
+  ec2_group:
+    name: rds_security_group
+    description: security group for RDS
+    vpc_id: "{{ default_vpc_id }}"
+    profile: "{{ profile }}"
+    region: "{{ region }}"
+    rules:
+      - proto: tcp
+        ports: 3306
+        cidr_ip: "{{ k8s_vpc_cidr_block }}"
+        rule_desc: Access to K8s VPC for 3306
+      - proto: tcp
+        ports: 3306
+        cidr_ip: "{{ default_vpc_cidr_block }}"
+        rule_desc: Access to default VPC for 3306
+  register: rds_security_group
+
+- name: set fact  
+  set_fact:
+      rds_security_group_id: "{{rds_security_group.group_id}}"
+
+- name: Create RDS
+  rds:
+    command: create
+    region: "{{region}}"
+    profile: "{{profile}}"
+    db_engine: mariadb
+    instance_name: csye7374
+    size: "10"
+    instance_type: db.t2.micro
+    username: root
+    password: "{{db_password}}"
+    publicly_accessible: "False"
+    vpc_security_groups: "{{rds_security_group_id}}"
+    backup_retention: "0"
+    db_name: csye7374
+  async: 500
+  poll: 0   
