@@ -1,86 +1,116 @@
----
-- name: Create a api namespace
-  k8s:
-    name: ui
-    api_version: v1
-    kind: Namespace
-    state: present
-  register: ui_namespace
+- name: Run on Local
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: False
 
-- name: Create a replica set
-  k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: ReplicaSet
-      metadata:
-        name: frontend-replica
-        namespace: "{{ui_namespace.result.metadata.name}}"
-        labels:
-          app: recipe
-          tier: frontend
-      spec:
-        # modify replicas according to your case
-        replicas: 1
-        selector:
-          matchLabels:
-            tier: frontend
-        template:
+  tasks:
+    - name: Create a api namespace
+      k8s:
+        name: ui
+        api_version: v1
+        kind: Namespace
+        state: present
+      register: ui_namespace
+
+    - name: Get an existing Service object
+      k8s_info:
+        api_version: v1
+        kind: Service
+        name: api
+        namespace: api
+      register: api_service
+
+    - name: Create backend config
+      k8s:
+        state: present
+        definition:
+          kind: ConfigMap 
+          apiVersion: v1
           metadata:
+            name: ui-config
+            namespace: "{{ui_namespace.result.metadata.name}}"
+          data:
+            # Configuration values can be set as key-value properties
+            backend_url : "http://{{api_service.resources[0].status.loadBalancer.ingress[0].hostname}}:8080"
+
+    - name: Create a replica set
+      k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ReplicaSet
+          metadata:
+            name: frontend-replica
+            namespace: "{{ui_namespace.result.metadata.name}}"
             labels:
+              app: recipe
               tier: frontend
           spec:
-            initContainers:
-              - name: init-myservice
-                image: busybox:1.28
-                command:
-                  [
-                    "sh",
-                    "-c",
-                    "until nslookup api.api.svc.cluster.local; do echo waiting for myservice; sleep 2; done;",
-                  ]
-            containers:
-              - name: frontend
-                image: akashkatakam/webapp-frontend:v1
-                imagePullPolicy: Always
-                ports:
-                  - containerPort: 3000
-                    hostPort: 3000
-                readinessProbe:
-                  httpGet:
-                    path: /
-                    port: 3000
-                  initialDelaySeconds: 15
-                  periodSeconds: 10
-                livenessProbe:
-                  httpGet:
-                    path: /
-                    port: 3000
-                  initialDelaySeconds: 15
-                  periodSeconds: 10
-                env:
-                  - name: REACT_APP_BACKEND_URL
-                    value: http://localhost:8080
+            # modify replicas according to your case
+            replicas: 2
+            selector:
+              matchLabels:
+                tier: frontend
+            template:
+              metadata:
+                labels:
+                  tier: frontend
+              spec:
+                 initContainers:
+                   - name: init-myservice
+                     image: busybox:1.28
+                     command:
+                       [
+                         "sh",
+                         "-c",
+                         "until nslookup api.api.svc.cluster.local; do echo waiting for myservice; sleep 2; done;",
+                       ]
+                 containers:
+                  - name: frontend
+                    image: kiranhun/frontend:7937f7e9383d65885ad1b618b008f26ccdd653aa
+                    imagePullPolicy: Always
+                    ports:
+                      - containerPort: 3000
+                        hostPort: 3000
+                    readinessProbe:
+                      httpGet:
+                        path: /
+                        port: 3000
+                      initialDelaySeconds: 15
+                      periodSeconds: 10
+                    livenessProbe:
+                      httpGet:
+                        path: /
+                        port: 3000
+                      initialDelaySeconds: 15
+                      periodSeconds: 10
+                    env:
+                      - name: REACT_APP_BACKEND_URL
+                        valueFrom:
+                          configMapKeyRef:
+                            name: ui-config
+                            key: backend_url
 
-                command: ["npm", "start"]
-            imagePullSecrets:
-              - name: docker_token
+                    command: ["npm", "start"]
+                 imagePullSecrets:
+                  - name: docker_token
 
-- name: Create a load balancer service
-  k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: ui
-        namespace: "{{ui_namespace.result.metadata.name}}"
-      spec:
-        selector:
-          tier: frontend
-        type: LoadBalancer
-        ports:
-          - protocol: TCP
-            port: 3000
-            targetPort: 3000
-            name: http
+    - name: Create a load balancer service
+      k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ui
+            namespace: "{{ui_namespace.result.metadata.name}}"
+          spec:
+            selector:
+              tier: frontend
+            type: LoadBalancer
+            ports:
+              - protocol: TCP
+                port: 3000
+                targetPort: 3000
+                name: http

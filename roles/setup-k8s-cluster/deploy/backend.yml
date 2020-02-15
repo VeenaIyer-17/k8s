@@ -5,6 +5,11 @@
   gather_facts: False
 
   tasks:
+    - name: get rds endpoint
+      - rds_instance_info:
+          db_instance_identifier: csye7374
+        register: new_database_info
+
     - name: Create a api namespace
       k8s:
         name: api
@@ -24,7 +29,7 @@
             namespace: "{{api_namespace.result.metadata.name}}"
           data:
             # Configuration values can be set as key-value properties
-            MYSQL_HOST: "{{MYSQL_HOST}}"
+            MYSQL_HOST: "{{new_database_info.instances.endpoint.address}}"
 
     - name: create database secret
       k8s:
@@ -37,8 +42,8 @@
             namespace: "{{api_namespace.result.metadata.name}}"
           data:
             # Configuration values can be set as key-value properties
-            MYSQL_USER: "{{MYSQL_USER}}"
-            MYSQL_PASSWORD: "{{MYSQL_PASSWORD}}" 
+            MYSQL_USER: cm9vdAo=
+            MYSQL_PASSWORD: MjgwNDE5OTIK
 
     - name: create replicaset
       k8s:
@@ -64,40 +69,42 @@
                   tier: backend
               spec:
                 containers:
-                - name: backend
-                  image: "{{image_name_backend}}"
-                  imagePullPolicy: IfNotPresent
-                  ports:
-                    - containerPort: 8080
-                      hostPort: 8080
-                  readinessProbe:
-                    httpGet:
-                      path: /v1/allrecipes
-                      port: 8080
-                    initialDelaySeconds: 15
-                    periodSeconds: 10
-                  livenessProbe:
-                    httpGet:
-                      path: /v1/allrecipes
-                      port: 8080
-                    initialDelaySeconds: 15
-                    periodSeconds: 10
-                  env:
-                  - name: MYSQL_HOST
-                    valueFrom:
-                        configMapKeyRef:
-                          name: database-config
-                          key: MYSQL_HOST
-                  - name: MYSQL_USER
-                    valueFrom:
-                        secretKeyRef:
-                          name: database-secret
-                          key: MYSQL_USER
-                  - name: MYSQL_PASSWORD
-                    valueFrom:
-                        secretKeyRef:
-                          name: database-secret
-                          key: MYSQL_PASSWORD
+                  - name: backend
+                    image: kiranhun/backend:12e2397a05416fab2c710bbe23921183c540b0a5
+                    imagePullPolicy: IfNotPresent
+                    ports:
+                      - containerPort: 8080
+                        hostPort: 8080
+                    readinessProbe:
+                      httpGet:
+                        path: /v1/allrecipes
+                        port: 8080
+                      initialDelaySeconds: 15
+                      periodSeconds: 10
+                    livenessProbe:
+                      httpGet:
+                        path: /v1/allrecipes
+                        port: 8080
+                      initialDelaySeconds: 15
+                      periodSeconds: 10
+                    env:
+                    - name: MYSQL_HOST
+                      valueFrom:
+                          configMapKeyRef:
+                            name: database-config
+                            key: MYSQL_HOST
+                    - name: MYSQL_USER
+                      valueFrom:
+                          secretKeyRef:
+                            name: database-secret
+                            key: MYSQL_USER
+                    - name: MYSQL_PASSWORD
+                      valueFrom:
+                          secretKeyRef:
+                            name: database-secret
+                            key: MYSQL_PASSWORD
+                imagePullSecrets:
+                  - name: docker_token
 
     - name: Create a load balancer service
       k8s:
