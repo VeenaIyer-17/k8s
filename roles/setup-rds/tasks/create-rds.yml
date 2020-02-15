@@ -3,7 +3,8 @@
   ec2_vpc_net_info:
     profile: "{{profile}}"
     region: "{{region}}"
-    vpc_ids: vpc-64b7981e
+    filters:
+      "tag:Name": "{{vpc_name}}"
   register: defaultVPC
   set_fact:
       default_vpc_id: "{{ defaultVPC.vpcs[0].vpc_id }}"
