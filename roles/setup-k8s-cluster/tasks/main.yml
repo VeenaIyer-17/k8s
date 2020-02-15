@@ -10,6 +10,9 @@
 - name: Validate Cluster
   import_tasks: validate-cluster.yml
 
+- name: create docker secret
+  import_tasks: deploy/docker-secret.yml
+
 - name: Deploy Backend
   import_tasks: deploy/backend.yml
 
