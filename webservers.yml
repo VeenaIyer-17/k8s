@@ -2,22 +2,30 @@
 - name: Run on Local
   hosts: localhost
   connection: local
+  environment:
+    - AWS_REGION: "{{ region }}"
+    - NAME: "{{ cluster_name }}"
+    - KOPS_STATE_STORE: s3://{{cluster_name}}
+    - AWS_PROFILE: "{{profile}}"
   become: false
   gather_facts: False
   vars_files:
     - vars/main.yml
-  
+
   tasks:
     - name: set kops state store
       set_fact:
         kops_state_store: s3://{{cluster_name}}
-        
+
   roles:
-  - role: setup-k8s-cluster
-    when: command == "start"
+    - role: setup-rds
+      when: command == "start"
 
-  - role: delete-k8s-cluster
-    when: command == "stop"
+    - role: setup-k8s-cluster
+      when: command == "start"
 
-  - role: setup-vpc-peering
-    when: command == "start"
+    - role: delete-k8s-cluster
+      when: command == "stop"
+
+    - role: setup-vpc-peering
+      when: command == "start"

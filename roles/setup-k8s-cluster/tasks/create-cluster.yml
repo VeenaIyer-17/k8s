@@ -1,14 +1,10 @@
 - name: Initiate Create Kubernetes Cluster
   shell: echo "Creating Cluster   {{ cluster_name }} "
 
-- name: debug kops state
-  debug:
-    msg: "{{kops_state_store}}"
-
-# - name: get clusters
-#   command: kops get clusters
-#   ignore_errors: yes
-#   register: clusters
+- name: get clusters
+  command: kops get clusters
+  ignore_errors: yes
+  register: clusters
 
 - name: Get cluster environment
   set_fact:
@@ -56,7 +52,7 @@
 - name: Creating Cluster Configuration
   shell: |
     AWS_PROFILE={{ profile }} kops create cluster \
-    --cloud={{ cloud }} --zones={{ nodes_availability_zones }} \
+    --cloud={{ cloud }} --zones={{ nodes_availability_zones }} \  
     --master-count={{ master_node_count }} \
     --master-zones={{ masters_availability_zones }} \
     --dns-zone={{ dns_zone_id }} \ 
@@ -70,7 +66,8 @@
     --ssh-public-key={{ ssh_path }} \
     --state={{ kops_state_store }} \
     --kubernetes-version={{ kubernetes_version }}
-  # when: clusters.stdout.find( '{{cluster_name}}' ) == -1
+  when: clusters.stdout.find( '{{cluster_name}}' ) == -1
+
 
 - name: Setup Cluster
   shell: AWS_PROFILE={{ profile }} kops update cluster {{ cluster_name }} --state={{ kops_state_store }} --yes

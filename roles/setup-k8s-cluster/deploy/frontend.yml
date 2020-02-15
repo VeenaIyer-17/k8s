@@ -1,0 +1,86 @@
+---
+- name: Create a api namespace
+  k8s:
+    name: ui
+    api_version: v1
+    kind: Namespace
+    state: present
+  register: ui_namespace
+
+- name: Create a replica set
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ReplicaSet
+      metadata:
+        name: frontend-replica
+        namespace: "{{ui_namespace.result.metadata.name}}"
+        labels:
+          app: recipe
+          tier: frontend
+      spec:
+        # modify replicas according to your case
+        replicas: 1
+        selector:
+          matchLabels:
+            tier: frontend
+        template:
+          metadata:
+            labels:
+              tier: frontend
+          spec:
+            initContainers:
+              - name: init-myservice
+                image: busybox:1.28
+                command:
+                  [
+                    "sh",
+                    "-c",
+                    "until nslookup api.api.svc.cluster.local; do echo waiting for myservice; sleep 2; done;",
+                  ]
+            containers:
+              - name: frontend
+                image: akashkatakam/webapp-frontend:v1
+                imagePullPolicy: Always
+                ports:
+                  - containerPort: 3000
+                    hostPort: 3000
+                readinessProbe:
+                  httpGet:
+                    path: /
+                    port: 3000
+                  initialDelaySeconds: 15
+                  periodSeconds: 10
+                livenessProbe:
+                  httpGet:
+                    path: /
+                    port: 3000
+                  initialDelaySeconds: 15
+                  periodSeconds: 10
+                env:
+                  - name: REACT_APP_BACKEND_URL
+                    value: http://localhost:8080
+
+                command: ["npm", "start"]
+            imagePullSecrets:
+              - name: docker_token
+
+- name: Create a load balancer service
+  k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: ui
+        namespace: "{{ui_namespace.result.metadata.name}}"
+      spec:
+        selector:
+          tier: frontend
+        type: LoadBalancer
+        ports:
+          - protocol: TCP
+            port: 3000
+            targetPort: 3000
+            name: http
