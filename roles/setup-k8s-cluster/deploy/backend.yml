@@ -14,7 +14,7 @@
   register: api_namespace
 
 - name: Create Secret key backend
-  shell: "kubectl create secret generic myregistrykey --from-file=.dockerconfigjson=/home/atom/.docker/config.json --type=kubernetes.io/dockerconfigjson -n {{api_namespace.result.metadata.name}}"
+  shell: "kubectl create secret generic myregistrykey --from-file=.dockerconfigjson={{home_path}}/.docker/config.json --type=kubernetes.io/dockerconfigjson -n {{api_namespace.result.metadata.name}}"
   ignore_errors: true
   
 - name: create database config
