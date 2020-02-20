@@ -29,6 +29,7 @@
       data:
         # Configuration values can be set as key-value properties
         MYSQL_HOST: "jdbc:mariadb://{{new_database_info.instances[0].endpoint.address}}:3306/csye7374"
+        BUCKET_NAME: "{{bucket_name}}"
 
 - name: create database secret
   k8s:
@@ -43,6 +44,20 @@
         # Configuration values can be set as key-value properties
         MYSQL_USER: cm9vdAo=
         MYSQL_PASSWORD: MjgwNDE5OTIK
+
+- name: create s3 secret 
+  k8s:
+    state: present
+    definition:
+      kind: Secret
+      apiVersion: v1
+      metadata:
+        name: s3-secret
+        namespace: "{{api_namespace.result.metadata.name}}"
+      data:
+        # Configuration values can be set as key-value properties
+        AWS_ACCESS_KEY_ID: "{{access_key}}"
+        AWS_SECRET_ACCESS_KEY: "{{secret_key}}"
 
 - name: create replicaset
   k8s:
@@ -92,6 +107,11 @@
                       configMapKeyRef:
                         name: database-config
                         key: MYSQL_HOST
+                - name: BUCKET_NAME
+                  valueFrom:
+                      configMapKeyRef:
+                        name: database-config
+                        key: BUCKET_NAME
                 - name: MYSQL_USER
                   valueFrom:
                       secretKeyRef:
@@ -102,6 +122,16 @@
                       secretKeyRef:
                         name: database-secret
                         key: MYSQL_PASSWORD
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                      secretKeyRef:
+                        name: s3-secret
+                        key: AWS_ACCESS_KEY_ID
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                      secretKeyRef:
+                        name: s3-secret
+                        key: AWS_SECRET_ACCESS_KEY
             imagePullSecrets:
               - name: myregistrykey
 
