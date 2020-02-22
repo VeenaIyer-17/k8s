@@ -20,8 +20,8 @@
 
 - name: Set Prod facts
   set_fact:
-    compute_node_size: "{{compute_node_size | default('t3.small')}}"
-    master_node_size: "{{master_node_size | default('m4.large')}}"
+    compute_node_size: "{{compute_node_size | default('t2.small')}}"
+    master_node_size: "{{master_node_size | default('t2.small')}}"
     master_node_count: "{{master_node_count | default(3)}}"
     node_counts: "{{node_counts | default(3)}}"
   when: type == "prod"

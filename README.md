@@ -4,8 +4,9 @@
 
 | Name | NEU ID | Email Address |
 | --- | --- | --- |
-| Ravi Kiran | 001439467 | lnu.ra@husky.neu.edu |
-| Veena Iyer | 001447061  | iyer.v@husky.neu.edu|
+| Akash Katakam | 001400025 | katakam.a@husky.neu.edu |
+| Ravi Kiran    | 001439467 | lnu.ra@husky.neu.edu |
+| Veena Iyer    | 001447061 | iyer.v@husky.neu.edu|
 
 ## Pre-requisites
 You need to configure the following first before using this playbook:
