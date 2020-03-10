@@ -1,0 +1,9 @@
+---
+- name: Setup Elastic
+  import_tasks: elasticsearch.yml
+
+- name: Setup FluentD
+  import_tasks: fluentd.yml
+
+- name: Setup Kibana
+  import_tasks: kibana.yml

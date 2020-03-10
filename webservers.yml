@@ -26,3 +26,6 @@
 
     - role: setup-vpc-peering
       when: command == "start"
+
+    # - role: setup-efk
+    #   when: command == "start"
