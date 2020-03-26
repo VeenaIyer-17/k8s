@@ -1,0 +1,3 @@
+---
+- name: install metric server
+  import_tasks: create-metric-server.yml
