@@ -2,7 +2,7 @@
 CLUSTER_NAME=$1
 CLOUD_PROVIDER=aws
 IMAGE=k8s.gcr.io/cluster-autoscaler:v1.2.2
-MIN_NODES=2
+MIN_NODES=1
 MAX_NODES=3
 AWS_REGION=us-east-1
 INSTANCE_GROUP_NAME="nodes"
@@ -12,10 +12,12 @@ SSL_CERT_PATH="/etc/ssl/certs/ca-certificates.crt"  #(/etc/ssl/certs for gce, /e
 KOPS_STATE_STORE=$2        #KOPS_STATE_STORE might already be set as an environment variable, in which case it doesn't have to be changed.
 
 echo "Set up Autoscaling"
+echo "Hello  $ASG_NAME"
+echo "Blah $KOPS_STATE_STORE"
 echo "   First, we need to update the minSize and maxSize attributes for the kops instancegroup."
 echo "   The next command will open the instancegroup config in your default editor, please save and exit the file once you're done…"
 sleep 1
-AWS_PROFILE=$3 kops replace -f roles/cluster-autoscaling/tasks/nodes-instance-group.yaml --state ${KOPS_STATE_STORE} --name ${CLUSTER_NAME}
+AWS_PROFILE=$3 kops replace -f roles/cluster-autoscaling/tasks/nodes-instance-group.yml --state ${KOPS_STATE_STORE} --name ${CLUSTER_NAME}
 echo "   Running kops update cluster --yes"
 AWS_PROFILE=$3 kops update cluster --yes --state ${KOPS_STATE_STORE} --name ${CLUSTER_NAME}
 printf "\n"

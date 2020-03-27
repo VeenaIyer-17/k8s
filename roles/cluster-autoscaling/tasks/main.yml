@@ -1,6 +1,6 @@
 - name: Replace cluster name in instance group yaml
   replace:
-    dest: roles/cluster-autoscaling/tasks/nodes-instance-group.yaml
+    dest: roles/cluster-autoscaling/tasks/nodes-instance-group.yml
     regexp: 'CLUSTER_NAME'
     replace: '{{ cluster_name }}'
 
