@@ -21,11 +21,14 @@
     - role: setup-k8s-cluster
       when: command == "start"
 
-    - role: metric-server
-      when: command == "start"
-
     - role: delete-k8s-cluster
       when: command == "stop"
 
     - role: setup-vpc-peering
+      when: command == "start"
+
+    - role: metric-server
+      when: command == "start"
+    
+    - role: cluster-autoscaling
       when: command == "start"
