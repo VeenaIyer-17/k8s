@@ -1,14 +1,39 @@
-- name: Replace cluster name in instance group yaml
-  replace:
-    dest: roles/cluster-autoscaling/tasks/nodes-instance-group.yml
-    regexp: 'CLUSTER_NAME'
-    replace: '{{ cluster_name }}'
+# - name: Replace cluster name in instance group yaml
+#   replace:
+#     dest: roles/cluster-autoscaling/tasks/nodes-instance-group.yml
+#     regexp: 'CLUSTER_NAME'
+#     replace: '{{ cluster_name }}'
 
-- name: Download cluster-autoscaler.yml
-  get_url:
-    url: https://raw.githubusercontent.com/kubernetes/kops/master/addons/cluster-autoscaler/v1.8.0.yaml
-    dest: roles/cluster-autoscaling/tasks/cluster-autoscaler.yml
+# - name: Download cluster-autoscaler.yml
+#   get_url:
+#     url: https://raw.githubusercontent.com/kubernetes/kops/master/addons/cluster-autoscaler/v1.8.0.yaml
+#     dest: roles/cluster-autoscaling/tasks/cluster-autoscaler.yml
 
-- name: Create Auto scaling Configuration
-  script:
-    cmd: autoscaling-cluster.sh "{{ cluster_name }}" "{{ kops_state_store }}" "{{ profile }}"
+# - name: Create Auto scaling Configuration
+#   script:
+#     cmd: autoscaling-cluster.sh "{{ cluster_name }}" "{{ kops_state_store }}" "{{ profile }}"
+---
+# tasks file for cluster-autoscaler
+- name: Edit Instance group maxsize
+  shell: "EDITOR='./roles/cluster-autoscaling/templates/yq-merge-editor.sh roles/cluster-autoscaling/templates/spec.yml' AWS_PROFILE={{ profile }} kops edit instancegroups nodes --state {{ state_store }} --name {{ cluster_name }}"
+
+- name: Create the physical cluster
+  shell: "AWS_PROFILE={{ profile }} kops update cluster {{ cluster_name }} --yes --state {{ state_store }}"
+
+- name: Validate cluster
+  shell: "AWS_PROFILE={{ profile }} kops validate cluster --name={{ cluster_name }} --state={{ state_store }}"
+  register: status
+  until: status.stdout.find('Your cluster '+ cluster_name +' is ready')  !=  -1
+  retries: 20
+  delay: 60
+
+- name: Assign a policy to a role
+  iam_policy:
+    iam_type: role
+    iam_name: "nodes.{{ cluster_name }}"
+    policy_name: aws-cluster-autoscaler
+    state: present
+    policy_document: asg-policy.json
+
+- name: Install cluster-autoscaler
+  shell: "helm install cluster-autoscaler stable/cluster-autoscaler --set 'autoscalingGroups[0].name=nodes.{{ cluster_name }},autoscalingGroups[0].maxSize=5,autoscalingGroups[0].minSize=1,rbac.create=true' --set awsRegion=us-east-1 --set image.tag=v1.2.2"
