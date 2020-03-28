@@ -29,6 +29,6 @@
 
     - role: metric-server
       when: command == "start"
-    
+
     - role: cluster-autoscaling
-      when: command == "start"
+      when: command == "go"
