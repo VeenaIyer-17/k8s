@@ -26,3 +26,9 @@
 
     - role: setup-vpc-peering
       when: command == "start"
+
+    - role: metric-server
+      when: command == "start"
+
+    - role: cluster-autoscaling
+      when: command == "go"

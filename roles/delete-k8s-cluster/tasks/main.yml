@@ -1,6 +1,9 @@
 - name: Delete VPC peering
   import_tasks: delete-vpc-peering.yml
 
+- name: Delete IAM Policy
+  import_tasks: delete-iam-policy.yml
+
 - name: Delete Cluster
   import_tasks: delete-cluster.yml
 

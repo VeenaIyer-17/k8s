@@ -12,16 +12,16 @@
 
 - name: Set dev facts
   set_fact:
-    compute_node_size: "{{ compute_node_size | default('t2.micro') }}"
-    master_node_size: "{{ master_node_size | default('t2.micro')}}"
+    compute_node_size: "{{ compute_node_size | default('t2.small') }}"
+    master_node_size: "{{ master_node_size | default('t2.small')}}"
     master_node_count: "{{ master_node_count | default(1)}}"
-    node_counts: "{{ node_counts | default(1)}}"
+    node_counts: "{{ node_counts | default(3)}}"
   when: type == "dev"
 
 - name: Set Prod facts
   set_fact:
-    compute_node_size: "{{compute_node_size | default('t2.small')}}"
-    master_node_size: "{{master_node_size | default('t2.small')}}"
+    compute_node_size: "{{compute_node_size | default('t3a.large')}}"
+    master_node_size: "{{master_node_size | default('t3a.large')}}"
     master_node_count: "{{master_node_count | default(3)}}"
     node_counts: "{{node_counts | default(3)}}"
   when: type == "prod"
